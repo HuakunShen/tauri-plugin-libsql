@@ -2,6 +2,41 @@
 
 A Tauri plugin for [libsql](https://github.com/tursodatabase/libsql) with built-in AES-256-CBC encryption, Drizzle ORM support, and a browser-compatible migration runner.
 
+## Try the Example App
+
+The fastest way to understand the full workflow (Drizzle ORM, browser-safe migrations, optional encryption, and Turso sync) is to run the demo app.
+
+![Todo List Demo App](examples/todo-list/todo-list.png)
+
+```bash
+cd examples/todo-list
+bun install
+bun run tauri dev
+```
+
+For a complete walkthrough, see [`examples/todo-list/README.md`](examples/todo-list/README.md).
+
+---
+
+## Table of Contents
+
+- [Try the Example App](#try-the-example-app)
+- [Why this plugin?](#why-this-plugin)
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Database Location](#database-location)
+- [Drizzle ORM Integration](#drizzle-orm-integration)
+- [Migrations](#migrations)
+- [Encryption](#encryption)
+- [API Reference](#api-reference)
+- [Permissions](#permissions)
+- [Comparison with @tauri-apps/plugin-sql](#comparison-with-tauri-appsplugin-sql)
+- [Turso / Remote Database](#turso--remote-database)
+- [Bundle Size](#bundle-size)
+- [Using AI to Integrate This Plugin](#using-ai-to-integrate-this-plugin)
+- [Project Structure](#project-structure)
+
 ## Why this plugin?
 
 ### 1. Rust ORMs are painful for app development
