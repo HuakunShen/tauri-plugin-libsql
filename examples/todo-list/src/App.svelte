@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { Toaster } from "svelte-sonner";
+  import { getConfig } from "tauri-plugin-libsql-api";
   import TodoList from "$lib/TodoList.svelte";
   import Card from "$lib/components/Card.svelte";
   import CardHeader from "$lib/components/CardHeader.svelte";
@@ -11,6 +13,21 @@
 
   const STORAGE_SYNC_URL = "libsql-demo-sync-url";
   const STORAGE_AUTH_TOKEN = "libsql-demo-auth-token";
+
+  let encrypted = $state(false);
+  let configLoaded = $state(false);
+
+  // Use different db filenames when encryption is enabled to avoid
+  // "file is not a database" errors from opening an unencrypted db
+  // with an encryption key (or vice versa).
+  let localDbFile = $derived(encrypted ? "todos.enc.db" : "todos.db");
+  let tursoDbFile = $derived(encrypted ? "todos-turso.enc.db" : "todos-turso.db");
+
+  onMount(async () => {
+    const config = await getConfig();
+    encrypted = config.encrypted;
+    configLoaded = true;
+  });
 
   // Read saved settings synchronously — localStorage is available at module init
   let appliedSyncUrl = $state(localStorage.getItem(STORAGE_SYNC_URL) ?? "");
@@ -55,13 +72,18 @@
     </div>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {#if !configLoaded}
+        <div class="col-span-2 flex items-center justify-center py-16 text-muted-foreground">
+          <span class="text-sm">Loading...</span>
+        </div>
+      {:else}
       <!-- Left: Local DB -->
-      <TodoList dbFile="todos.db" position="bottom-left" />
+      <TodoList dbFile={localDbFile} position="bottom-left" />
 
       <!-- Right: Turso or connect form -->
       {#if appliedSyncUrl}
         <TodoList
-          dbFile="todos-turso.db"
+          dbFile={tursoDbFile}
           syncUrl={appliedSyncUrl}
           authToken={appliedAuthToken}
           onDisconnect={handleDisconnect}
@@ -131,6 +153,7 @@
             </div>
           </CardContent>
         </Card>
+      {/if}
       {/if}
     </div>
   </div>
