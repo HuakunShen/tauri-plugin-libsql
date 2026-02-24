@@ -17,14 +17,15 @@ thiserror = "2"
 indexmap = { version = "2", features = ["serde"] }
 tokio = { version = "1", features = ["sync", "rt", "rt-multi-thread"] }
 futures = "0.3"
-libsql = { version = "0.9.29", features = ["encryption", "core"] }
-bytes = "1"
+libsql = { version = "0.9.29", features = ["core"] }
+bytes = { version = "1", optional = true }
 
 [build-dependencies]
 tauri-plugin = { version = "2.5.3", features = ["build"] }
 
 [features]
-default = ["core"]
+default = ["core", "encryption"]
 core = ["libsql/core"]
+encryption = ["libsql/encryption", "dep:bytes"]
 replication = ["libsql/replication", "libsql/tls"]
 remote = ["libsql/remote", "libsql/tls"]

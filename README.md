@@ -439,12 +439,33 @@ If you need this now, contributions are welcome.
 
 Based on the included Todo List demo app (macOS, aarch64, release build):
 
-| Format | Size |
-|--------|------|
-| `.app` bundle | 15 MB |
-| `.dmg` installer | 6 MB |
+| Format | With encryption | Without encryption |
+|--------|----------------|--------------------|
+| `.app` bundle | 15 MB | 15 MB |
+| `.dmg` installer | 6.0 MB | 5.9 MB |
 
-The bulk of the size comes from the libsql native library (SQLite + encryption). Apps without encryption would be smaller, but libsql with the `encryption` feature is the primary dependency.
+Disabling encryption saves essentially nothing — the AES cipher code is negligible compared to the SQLite native library that's always present. The `encryption` feature flag still exists to avoid compiling encryption-related code if you want to enforce at compile time that no database can be encrypted.
+
+### Disabling encryption
+
+Encryption is a default feature. To opt out, disable default features and select only what you need:
+
+**`Cargo.toml`** (in your Tauri app):
+
+```toml
+tauri-plugin-libsql = { version = "0.1.0", default-features = false, features = ["core"] }
+```
+
+**Available features:**
+
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `core` | ✅ | Local SQLite databases (always required) |
+| `encryption` | ✅ | AES-256-CBC encryption via libsql |
+| `replication` | ❌ | libsql replication support (adds TLS) |
+| `remote` | ❌ | Remote database support (planned, see below) |
+
+When `encryption` is disabled, passing an `EncryptionConfig` to `Database.load()` returns an error at runtime. The TypeScript API surface is unchanged — no rebuild of your JS code needed.
 
 ---
 

@@ -8,6 +8,7 @@ pub enum Cipher {
     Aes256Cbc,
 }
 
+#[cfg(feature = "encryption")]
 impl From<Cipher> for libsql::Cipher {
     fn from(cipher: Cipher) -> Self {
         match cipher {
@@ -24,6 +25,7 @@ pub struct EncryptionConfig {
     pub key: Vec<u8>,
 }
 
+#[cfg(feature = "encryption")]
 impl From<EncryptionConfig> for libsql::EncryptionConfig {
     fn from(config: EncryptionConfig) -> Self {
         libsql::EncryptionConfig::new(config.cipher.into(), bytes::Bytes::from(config.key))

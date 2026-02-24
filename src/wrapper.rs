@@ -57,11 +57,19 @@ impl DbConnection {
         };
 
         // Use the new Builder pattern
+        #[allow(unused_mut)]
         let mut builder = LibsqlBuilder::new_local(&full_path.to_string_lossy().to_string());
 
         // Apply encryption config if provided
+        #[cfg(feature = "encryption")]
         if let Some(config) = encryption {
             builder = builder.encryption_config(config.into());
+        }
+        #[cfg(not(feature = "encryption"))]
+        if encryption.is_some() {
+            return Err(crate::Error::InvalidDbUrl(
+                "encryption feature is not enabled — rebuild with `encryption` feature".into(),
+            ));
         }
 
         let db = builder.build().await?;
