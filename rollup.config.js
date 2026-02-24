@@ -5,22 +5,25 @@ import typescript from '@rollup/plugin-typescript'
 
 const pkg = JSON.parse(readFileSync(join(cwd(), 'package.json'), 'utf8'))
 
+// Get export paths from the "." export
+const exports = pkg.exports['.'] || pkg.exports
+
 export default {
   input: 'guest-js/index.ts',
   output: [
     {
-      file: pkg.exports.import,
+      file: exports.import,
       format: 'esm'
     },
     {
-      file: pkg.exports.require,
+      file: exports.require,
       format: 'cjs'
     }
   ],
   plugins: [
     typescript({
       declaration: true,
-      declarationDir: dirname(pkg.exports.import)
+      declarationDir: dirname(exports.import)
     })
   ],
   external: [

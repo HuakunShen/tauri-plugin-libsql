@@ -1,34 +1,49 @@
 use serde::de::DeserializeOwned;
-use tauri::{
-  plugin::{PluginApi, PluginHandle},
-  AppHandle, Runtime,
-};
+use std::path::PathBuf;
+use tauri::{plugin::PluginApi, AppHandle, Runtime};
 
 use crate::models::*;
 
 #[cfg(target_os = "ios")]
 tauri::ios_plugin_binding!(init_plugin_libsql);
 
+// Use desktop Config
+pub use crate::desktop::Config;
+
+#[cfg(target_os = "ios")]
+tauri::ios_plugin_binding!(init_plugin_libsql);
+
 // initializes the Kotlin or Swift plugin classes
 pub fn init<R: Runtime, C: DeserializeOwned>(
-  _app: &AppHandle<R>,
-  api: PluginApi<R, C>,
-) -> crate::Result<Libsql<R>> {
-  #[cfg(target_os = "android")]
-  let handle = api.register_android_plugin("", "ExamplePlugin")?;
-  #[cfg(target_os = "ios")]
-  let handle = api.register_ios_plugin(init_plugin_libsql)?;
-  Ok(Libsql(handle))
+    _app: &AppHandle<R>,
+    _api: PluginApi<R, C>,
+    config: Config,
+) -> crate::Result<Libsql> {
+    // For mobile, we'll use a simple config-based approach
+    // The actual mobile implementation would need platform-specific code
+    Ok(Libsql(config))
 }
 
 /// Access to the libsql APIs.
-pub struct Libsql<R: Runtime>(PluginHandle<R>);
+pub struct Libsql(Config);
 
-impl<R: Runtime> Libsql<R> {
-  pub fn ping(&self, payload: PingRequest) -> crate::Result<PingResponse> {
-    self
-      .0
-      .run_mobile_plugin("ping", payload)
-      .map_err(Into::into)
-  }
+impl Libsql {
+    pub fn ping(&self, payload: PingRequest) -> crate::Result<PingResponse> {
+        Ok(PingResponse {
+            value: payload.value,
+        })
+    }
+
+    /// Get the configured base path for databases
+    pub fn base_path(&self) -> PathBuf {
+        self.0
+            .base_path
+            .clone()
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+    }
+
+    /// Get the default encryption config
+    pub fn encryption(&self) -> Option<&EncryptionConfig> {
+        self.0.encryption.as_ref()
+    }
 }

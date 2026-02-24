@@ -1,6 +1,6 @@
 use tauri::{
-  plugin::{Builder, TauriPlugin},
-  Manager, Runtime,
+    plugin::{Builder, TauriPlugin},
+    Manager, Runtime,
 };
 
 pub use models::*;
@@ -11,38 +11,42 @@ mod desktop;
 mod mobile;
 
 mod commands;
+mod decode;
 mod error;
 mod models;
+mod wrapper;
 
 pub use error::{Error, Result};
+pub use wrapper::DbInstances;
 
-#[cfg(desktop)]
-use desktop::Libsql;
-#[cfg(mobile)]
-use mobile::Libsql;
-
-/// Extensions to [`tauri::App`], [`tauri::AppHandle`] and [`tauri::Window`] to access the libsql APIs.
-pub trait LibsqlExt<R: Runtime> {
-  fn libsql(&self) -> &Libsql<R>;
-}
-
-impl<R: Runtime, T: Manager<R>> crate::LibsqlExt<R> for T {
-  fn libsql(&self) -> &Libsql<R> {
-    self.state::<Libsql<R>>().inner()
-  }
-}
-
-/// Initializes the plugin.
+/// Re-export Config for convenience
+pub use desktop::Config;
+/// Initializes the plugin with default configuration.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
-  Builder::new("libsql")
-    .invoke_handler(tauri::generate_handler![commands::ping])
-    .setup(|app, api| {
-      #[cfg(mobile)]
-      let libsql = mobile::init(app, api)?;
-      #[cfg(desktop)]
-      let libsql = desktop::init(app, api)?;
-      app.manage(libsql);
-      Ok(())
-    })
-    .build()
+    init_with_config(Config::default())
+}
+
+/// Initializes the plugin with custom configuration.
+pub fn init_with_config<R: Runtime>(config: Config) -> TauriPlugin<R> {
+    Builder::new("libsql")
+        .invoke_handler(tauri::generate_handler![
+            commands::load,
+            commands::execute,
+            commands::select,
+            commands::close,
+            commands::ping,
+            commands::get_config
+        ])
+        .setup(move |app, _api| {
+            #[cfg(mobile)]
+            let libsql = mobile::init(app, _api, config.clone())?;
+            #[cfg(desktop)]
+            let libsql = desktop::init(app, _api, config)?;
+
+            app.manage(libsql);
+            app.manage(DbInstances::default());
+
+            Ok(())
+        })
+        .build()
 }
