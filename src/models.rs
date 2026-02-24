@@ -36,10 +36,14 @@ impl From<EncryptionConfig> for libsql::EncryptionConfig {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LoadOptions {
-    /// Database path (e.g., "sqlite:test.db" or just "test.db")
+    /// Database path. For local files: "sqlite:myapp.db". For pure remote: "libsql://…"
     pub path: String,
-    /// Optional encryption configuration
+    /// Optional encryption configuration (local databases only)
     pub encryption: Option<EncryptionConfig>,
+    /// Remote database URL for embedded replica mode (e.g. "libsql://mydb.turso.io")
+    pub sync_url: Option<String>,
+    /// Auth token for remote/Turso connections
+    pub auth_token: Option<String>,
 }
 
 /// Result of an execute operation

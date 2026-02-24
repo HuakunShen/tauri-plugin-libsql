@@ -6,9 +6,11 @@ Default permissions for the plugin
 
 - `allow-load`
 - `allow-execute`
+- `allow-batch`
 - `allow-select`
 - `allow-close`
 - `allow-get-config`
+- `allow-sync`
 
 ## Permission Table
 
@@ -18,6 +20,32 @@ Default permissions for the plugin
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`libsql:allow-batch`
+
+</td>
+<td>
+
+Enables the batch command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`libsql:deny-batch`
+
+</td>
+<td>
+
+Denies the batch command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>
@@ -197,6 +225,32 @@ Enables the select command without any pre-configured scope.
 <td>
 
 Denies the select command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`libsql:allow-sync`
+
+</td>
+<td>
+
+Enables the sync command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`libsql:deny-sync`
+
+</td>
+<td>
+
+Denies the sync command without any pre-configured scope.
 
 </td>
 </tr>

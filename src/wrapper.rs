@@ -1,9 +1,11 @@
 use futures::lock::Mutex;
+use futures::FutureExt;
 use indexmap::IndexMap;
 use libsql::{params::Params, Builder as LibsqlBuilder, Connection, Database, Value};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
-use std::path::{Component, PathBuf};
+use std::panic::AssertUnwindSafe;
+use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
 use crate::decode;
@@ -13,69 +15,175 @@ use crate::models::{EncryptionConfig, QueryResult};
 /// A wrapper around libsql connection
 pub struct DbConnection {
     conn: Connection,
-    #[allow(dead_code)]
     db: Database,
 }
 
 impl DbConnection {
-    /// Connect to a libsql database
+    /// Connect to a libsql database.
+    ///
+    /// - Local only: `sync_url` = None
+    /// - Embedded replica (Turso): `sync_url` = Some("libsql://…"), `auth_token` = Some("…")
+    /// - Pure remote: `path` starts with "libsql://" or "https://", no `sync_url`
     pub async fn connect(
         path: &str,
         encryption: Option<EncryptionConfig>,
         base_path: PathBuf,
+        sync_url: Option<String>,
+        auth_token: Option<String>,
     ) -> Result<Self, Error> {
-        // Parse path - handle both "sqlite:path" and plain "path" formats
+        // Wrap in catch_unwind: libsql's builder calls unwrap() internally and can
+        // panic on a malformed URL, which would cause the Tauri IPC to hang forever.
+        let path = path.to_string();
+        let db = AssertUnwindSafe(async move {
+            if let Some(url) = sync_url {
+                let full_path = Self::resolve_local_path(&path, &base_path)?;
+                Self::open_replica(full_path, url, auth_token.unwrap_or_default(), encryption).await
+            } else if path.starts_with("libsql://") || path.starts_with("https://") {
+                Self::open_remote(path, auth_token.unwrap_or_default()).await
+            } else {
+                let full_path = Self::resolve_local_path(&path, &base_path)?;
+                Self::open_local(full_path, encryption).await
+            }
+        })
+        .catch_unwind()
+        .await
+        .map_err(|_| {
+            Error::InvalidDbUrl(
+                "libsql panicked building the database — check your URL format \
+                 (expected libsql://… or https://…)"
+                    .into(),
+            )
+        })??;
+
+        let conn = db.connect()?;
+        Ok(Self { conn, db })
+    }
+
+    // ── connection mode helpers ──────────────────────────────────────────────
+
+    fn resolve_local_path(path: &str, base_path: &Path) -> Result<PathBuf, Error> {
         let db_path = path.strip_prefix("sqlite:").unwrap_or(path);
 
-        // Build full path - use base_path for relative paths
-        let full_path = if db_path == ":memory:" {
-            PathBuf::from(":memory:")
-        } else if PathBuf::from(db_path).is_absolute() {
-            // Use absolute paths as-is
-            PathBuf::from(db_path)
-        } else {
-            // For relative paths, join with base_path then normalise away any
-            // `..` components so a path like "../../etc/passwd" can't escape.
-            let joined = base_path.join(db_path);
-            let normalised = joined.components().fold(PathBuf::new(), |mut acc, c| {
-                match c {
-                    Component::ParentDir => {
-                        acc.pop();
-                    }
-                    Component::CurDir => {}
-                    _ => acc.push(c),
-                }
-                acc
-            });
-            if !normalised.starts_with(&base_path) {
-                return Err(crate::Error::InvalidDbUrl(format!(
-                    "path '{}' escapes the base directory",
-                    db_path
-                )));
-            }
-            normalised
-        };
+        if db_path == ":memory:" {
+            return Ok(PathBuf::from(":memory:"));
+        }
 
-        // Use the new Builder pattern
+        if PathBuf::from(db_path).is_absolute() {
+            return Ok(PathBuf::from(db_path));
+        }
+
+        // Normalise away `..` so a path can't escape base_path
+        let joined = base_path.join(db_path);
+        let normalised = joined.components().fold(PathBuf::new(), |mut acc, c| {
+            match c {
+                Component::ParentDir => {
+                    acc.pop();
+                }
+                Component::CurDir => {}
+                _ => acc.push(c),
+            }
+            acc
+        });
+
+        if !normalised.starts_with(base_path) {
+            return Err(Error::InvalidDbUrl(format!(
+                "path '{}' escapes the base directory",
+                db_path
+            )));
+        }
+
+        Ok(normalised)
+    }
+
+    async fn open_local(
+        full_path: PathBuf,
+        encryption: Option<EncryptionConfig>,
+    ) -> Result<Database, Error> {
         #[allow(unused_mut)]
         let mut builder = LibsqlBuilder::new_local(&full_path.to_string_lossy().to_string());
 
-        // Apply encryption config if provided
         #[cfg(feature = "encryption")]
         if let Some(config) = encryption {
             builder = builder.encryption_config(config.into());
         }
         #[cfg(not(feature = "encryption"))]
         if encryption.is_some() {
-            return Err(crate::Error::InvalidDbUrl(
-                "encryption feature is not enabled — rebuild with `encryption` feature".into(),
+            return Err(Error::InvalidDbUrl(
+                "encryption feature is not enabled — rebuild with the `encryption` feature".into(),
             ));
         }
 
-        let db = builder.build().await?;
-        let conn = db.connect()?;
+        Ok(builder.build().await?)
+    }
 
-        Ok(Self { conn, db })
+    #[cfg(feature = "replication")]
+    async fn open_replica(
+        full_path: PathBuf,
+        sync_url: String,
+        auth_token: String,
+        encryption: Option<EncryptionConfig>,
+    ) -> Result<Database, Error> {
+        #[allow(unused_mut)]
+        let mut builder = LibsqlBuilder::new_remote_replica(
+            full_path.to_string_lossy().to_string(),
+            sync_url,
+            auth_token,
+        );
+
+        #[cfg(feature = "encryption")]
+        if let Some(config) = encryption {
+            builder = builder.encryption_config(config.into());
+        }
+
+        let db = builder.build().await?;
+        // Initial sync so the local replica is up-to-date on connect
+        db.sync().await?;
+        Ok(db)
+    }
+
+    #[cfg(not(feature = "replication"))]
+    async fn open_replica(
+        _full_path: PathBuf,
+        _sync_url: String,
+        _auth_token: String,
+        _encryption: Option<EncryptionConfig>,
+    ) -> Result<Database, Error> {
+        Err(Error::InvalidDbUrl(
+            "embedded replica requires the `replication` feature — add features = [\"replication\"] to your Cargo.toml".into(),
+        ))
+    }
+
+    #[cfg(feature = "remote")]
+    async fn open_remote(url: String, auth_token: String) -> Result<Database, Error> {
+        Ok(LibsqlBuilder::new_remote(url, auth_token).build().await?)
+    }
+
+    #[cfg(not(feature = "remote"))]
+    async fn open_remote(_url: String, _auth_token: String) -> Result<Database, Error> {
+        Err(Error::InvalidDbUrl(
+            "remote connections require the `remote` feature — add features = [\"remote\"] to your Cargo.toml".into(),
+        ))
+    }
+
+    // ── public API ───────────────────────────────────────────────────────────
+
+    /// Sync an embedded replica with its remote database.
+    /// No-op (returns Ok) for local-only databases when replication is disabled.
+    pub async fn sync(&self) -> Result<(), Error> {
+        Self::do_sync(&self.db).await
+    }
+
+    #[cfg(feature = "replication")]
+    async fn do_sync(db: &Database) -> Result<(), Error> {
+        db.sync().await?;
+        Ok(())
+    }
+
+    #[cfg(not(feature = "replication"))]
+    async fn do_sync(_db: &Database) -> Result<(), Error> {
+        Err(Error::OperationNotSupported(
+            "sync requires the `replication` feature".into(),
+        ))
     }
 
     /// Execute a query that doesn't return rows
@@ -117,10 +225,24 @@ impl DbConnection {
         Ok(results)
     }
 
-    /// Close the connection (database is dropped when struct is dropped)
+    /// Execute multiple SQL statements atomically inside a transaction.
+    /// Statements must not contain bound parameters — use for DDL and bulk DML only.
+    pub async fn batch(&self, queries: Vec<String>) -> Result<(), Error> {
+        self.conn.execute("BEGIN", Params::None).await?;
+        for query in &queries {
+            if let Err(e) = self.conn.execute(query.as_str(), Params::None).await {
+                let _ = self.conn.execute("ROLLBACK", Params::None).await;
+                return Err(Error::Libsql(e));
+            }
+        }
+        if let Err(e) = self.conn.execute("COMMIT", Params::None).await {
+            let _ = self.conn.execute("ROLLBACK", Params::None).await;
+            return Err(Error::Libsql(e));
+        }
+        Ok(())
+    }
+
     pub async fn close(&self) {
-        // libsql doesn't have explicit close - connection closes on drop
-        // We can reset the connection state if needed
         self.conn.reset().await;
     }
 }
@@ -132,11 +254,9 @@ fn json_to_params(values: Vec<JsonValue>) -> Params {
     }
 
     let params: Vec<Value> = values.into_iter().map(json_to_libsql_value).collect();
-
     Params::Positional(params)
 }
 
-/// Convert a JSON value to a libsql value
 fn json_to_libsql_value(v: JsonValue) -> Value {
     match v {
         JsonValue::Null => Value::Null,
@@ -152,7 +272,6 @@ fn json_to_libsql_value(v: JsonValue) -> Value {
         }
         JsonValue::String(s) => Value::Text(s),
         JsonValue::Array(ref arr) => {
-            // Convert array to blob if all numbers, otherwise serialize to JSON string
             if arr.iter().all(|v| v.is_number()) {
                 let bytes: Vec<u8> = arr
                     .iter()
@@ -160,8 +279,7 @@ fn json_to_libsql_value(v: JsonValue) -> Value {
                     .collect();
                 Value::Blob(bytes)
             } else {
-                let json_str = v.to_string();
-                Value::Text(json_str)
+                Value::Text(v.to_string())
             }
         }
         JsonValue::Object(_) => Value::Text(v.to_string()),

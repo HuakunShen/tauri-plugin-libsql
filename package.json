@@ -1,7 +1,11 @@
 {
   "name": "tauri-plugin-libsql-api",
   "version": "0.1.0",
-  "author": "You",
+  "author": "HuakunShen",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HuakunShen/tauri-plugin-libsql"
+  },
   "description": "Tauri plugin for libsql with encryption support",
   "type": "module",
   "types": "./dist-js/index.d.ts",

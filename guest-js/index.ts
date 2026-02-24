@@ -13,10 +13,28 @@ export interface EncryptionConfig {
 
 /** Options for loading a database */
 export interface LoadOptions {
-  /** Database path (e.g., "sqlite:test.db" or just "test.db") */
+  /**
+   * Database path.
+   * - Local file: `"sqlite:myapp.db"`
+   * - Pure remote (Turso): `"libsql://mydb-org.turso.io"`
+   */
   path: string;
-  /** Optional encryption configuration */
+  /** Encryption configuration (local databases only) */
   encryption?: EncryptionConfig;
+  /**
+   * Remote Turso URL for embedded replica mode.
+   * When set, the database operates as an embedded replica:
+   * a local SQLite file kept in sync with the remote.
+   * Requires the `replication` feature in Cargo.toml.
+   *
+   * @example "libsql://mydb-org.turso.io"
+   */
+  syncUrl?: string;
+  /**
+   * Auth token for Turso / remote connections.
+   * Required when `syncUrl` is set or when `path` is a remote URL.
+   */
+  authToken?: string;
 }
 
 /** Result of an execute operation */
@@ -74,22 +92,6 @@ export class Database {
 
     const _path = await invoke<string>("plugin:libsql|load", { options });
     return new Database(_path);
-  }
-
-  /**
-   * **get**
-   *
-   * A static initializer which synchronously returns an instance of
-   * the Database class while deferring the actual database connection
-   * until the first invocation or selection on the database.
-   *
-   * @example
-   * ```ts
-   * const db = Database.get("sqlite:test.db");
-   * ```
-   */
-  static get(path: string): Database {
-    return new Database(path);
   }
 
   /**
@@ -154,6 +156,54 @@ export class Database {
    *
    * @param db - Optionally state the name of a database if you are managing more than one. Otherwise, all database pools will be in scope.
    */
+  /**
+   * **batch**
+   *
+   * Executes multiple SQL statements atomically inside a single transaction.
+   * If any statement fails the entire batch is rolled back.
+   *
+   * Statements must not use bound parameters — for parameterised queries use
+   * `execute()` individually. Intended for DDL and bulk inserts/updates where
+   * partial failure is unacceptable.
+   *
+   * @example
+   * ```ts
+   * await db.batch([
+   *   "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)",
+   *   "CREATE TABLE posts (id INTEGER PRIMARY KEY, user_id INTEGER, body TEXT)",
+   *   "CREATE INDEX idx_posts_user ON posts(user_id)",
+   * ]);
+   * ```
+   */
+  async batch(queries: string[]): Promise<void> {
+    await invoke("plugin:libsql|batch", { db: this.path, queries });
+  }
+
+  /**
+   * **sync**
+   *
+   * Syncs an embedded replica with its remote Turso database.
+   * Call this when you want to pull the latest remote changes, e.g. on app
+   * resume or after a network reconnect.
+   *
+   * No-op for local-only databases (returns without error).
+   * Requires the `replication` feature in Cargo.toml.
+   *
+   * @example
+   * ```ts
+   * const db = await Database.load({
+   *   path: 'sqlite:local.db',
+   *   syncUrl: 'libsql://mydb-org.turso.io',
+   *   authToken: 'my-token',
+   * });
+   * // ... later, pull latest remote changes
+   * await db.sync();
+   * ```
+   */
+  async sync(): Promise<void> {
+    await invoke("plugin:libsql|sync", { db: this.path });
+  }
+
   async close(db?: string): Promise<boolean> {
     const success = await invoke<boolean>("plugin:libsql|close", { db });
     return success;

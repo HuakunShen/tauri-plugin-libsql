@@ -110,24 +110,22 @@ export async function migrate(
       continue
     }
 
-    // Split on semicolons to handle multi-statement migrations
+    // Split on semicolons to get individual statements.
+    // Note: this is a naive split — semicolons inside string literals will
+    // cause incorrect splits. drizzle-kit generated SQL does not produce this.
     const statements = migration.sql
       .split(';')
       .map((s) => s.trim())
       .filter((s) => s.length > 0)
 
-    for (const statement of statements) {
-      await invoke('plugin:libsql|execute', {
-        db: dbPath,
-        query: statement,
-        values: [],
-      })
-    }
+    // Record the migration in the same transaction as the schema changes so
+    // a partial failure leaves no trace. One invoke for the entire migration.
+    const safeName = migration.filename.replace(/'/g, "''")
+    statements.push(`INSERT INTO ${table} (hash) VALUES ('${safeName}')`)
 
-    await invoke('plugin:libsql|execute', {
+    await invoke('plugin:libsql|batch', {
       db: dbPath,
-      query: `INSERT INTO ${table} (hash) VALUES ($1)`,
-      values: [migration.filename],
+      queries: statements,
     })
   }
 }

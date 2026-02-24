@@ -1,7 +1,7 @@
 ---
 name: tauri-plugin-libsql
-description: Use tauri-plugin-libsql for SQLite database access in Tauri apps with Drizzle ORM, browser-safe migrations, and optional AES-256-CBC encryption. Use when working on this plugin's source, writing apps that consume it, adding schema changes, debugging migration or query errors, or configuring encryption.
-version: 1.0.0
+description: Use tauri-plugin-libsql for SQLite database access in Tauri apps with Drizzle ORM, browser-safe migrations, optional AES-256-CBC encryption, and Turso embedded replica sync. Use when working on this plugin's source, writing apps that consume it, adding schema changes, debugging migration or query errors, configuring encryption, or setting up Turso remote sync.
+version: 1.1.0
 license: MIT
 metadata:
   tags:
@@ -11,23 +11,26 @@ metadata:
     - drizzle-orm
     - encryption
     - migrations
+    - turso
+    - replication
 ---
 
 # tauri-plugin-libsql
 
-SQLite plugin for Tauri apps via libsql. Provides encryption, Drizzle ORM integration, and a browser-safe migration runner.
+SQLite plugin for Tauri apps via libsql. Provides encryption, Drizzle ORM integration, a browser-safe migration runner, and Turso embedded replica sync.
 
 ## Key Files
 
 ```
-guest-js/index.ts     — Database class, getConfig, re-exports
-guest-js/drizzle.ts   — createDrizzleProxy, createDrizzleProxyWithEncryption
-guest-js/migrate.ts   — migrate() function
-src/commands.rs       — Rust command handlers: load, execute, select, close
-src/wrapper.rs        — DbConnection (resolves base_path, calls libsql Builder)
-src/desktop.rs        — Config struct, base_path resolution
-src/lib.rs            — Plugin init, command registration
-examples/tauri-app/   — Reference demo: Drizzle + migrations + encryption
+guest-js/index.ts          — Database class, getConfig, re-exports
+guest-js/drizzle.ts        — createDrizzleProxy, createDrizzleProxyWithEncryption
+guest-js/migrate.ts        — migrate() function
+src/commands.rs            — Rust command handlers: load, execute, select, batch, sync, close
+src/wrapper.rs             — DbConnection (local / replica / remote, catch_unwind protection)
+src/desktop.rs             — Config struct, base_path resolution
+src/lib.rs                 — Plugin init, command registration
+src/error.rs               — Error types incl. OperationNotSupported
+examples/todo-list/        — Two-panel demo: local SQLite (left) + Turso sync (right)
 ```
 
 ## Critical: Why a Custom Migrator Exists
@@ -175,6 +178,55 @@ const db = drizzle(
 
 Never manually edit existing migration files. Add new ones only.
 
+## Turso Embedded Replica
+
+For local-first apps that sync with Turso cloud. Local reads are instant; writes go to the remote.
+
+### Enable
+
+In your app's `Cargo.toml`:
+```toml
+tauri-plugin-libsql = { path = "...", features = ["replication"] }
+```
+
+### Usage
+
+```typescript
+const db = await Database.load({
+  path: 'sqlite:local.db',           // local replica file
+  syncUrl: 'libsql://mydb-org.turso.io',
+  authToken: 'your-turso-auth-token',
+});
+
+await migrate(db.path, migrations);
+
+// Pull latest remote changes (on resume, reconnect, or user request)
+await db.sync();
+```
+
+`Database.load()` does an initial sync automatically. Use separate local files for local-only and replica databases — mixing them causes a "metadata file missing" error.
+
+### Troubleshooting Turso
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `loading` stuck forever | Bad URL causes libsql to panic internally; IPC never responds | Plugin catches this via `catch_unwind` and returns a proper error |
+| `no such table` after connecting | `__drizzle_migrations` has stale records from a previous run | Drop `todos` and `__drizzle_migrations`, re-run `migrate()` |
+| "invalid local state: db file exists but metadata file does not" | Plain SQLite file being opened as an embedded replica | Use a separate `dbFile` for each mode |
+
+## batch() — Atomic DDL / DML
+
+Execute multiple SQL statements in a single transaction. Use for DDL or bulk inserts. **Do not use bound parameters** (`$1` placeholders) — use `execute()` for parameterised queries.
+
+```typescript
+await db.batch([
+  'CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)',
+  'CREATE INDEX idx_name ON users(name)',
+]);
+```
+
+> **Note**: `execute_batch()` from libsql does not correctly route writes through the embedded replica layer. The plugin uses individual `execute()` calls inside an explicit `BEGIN`/`COMMIT` instead.
+
 ## Common Errors
 
 | Error | Cause | Fix |
@@ -186,6 +238,8 @@ Never manually edit existing migration files. Add new ones only.
 | `path '...' escapes the base directory` | Relative path contains `..` that exits `base_path` | Use a path that stays within the configured base directory |
 | DB file not found | Wrong working directory | Check `base_path` config or launch directory |
 | Encryption error on open | Wrong key for existing encrypted DB | Use exact same key as when DB was created |
+| `libsql panicked building the database` | Malformed `syncUrl` (spaces, wrong scheme, etc.) | Trim the URL; ensure it starts with `libsql://` or `https://` |
+| `operation not supported: sync requires replication feature` | `db.sync()` called without `replication` feature | Add `features = ["replication"]` to `Cargo.toml` |
 
 ## Plugin Architecture
 
@@ -193,17 +247,20 @@ Never manually edit existing migration files. Add new ones only.
 Frontend (TS)                    Rust Plugin
 ─────────────────                ─────────────────────────
 Database.load()      ──invoke──▶ commands::load()
-  migrate()          ──invoke──▶ commands::execute() (DDL)
+  migrate()          ──invoke──▶ commands::batch() (DDL in transaction)
   db.execute()       ──invoke──▶ commands::execute()
   db.select()        ──invoke──▶ commands::select()
+  db.batch()         ──invoke──▶ commands::batch()
+  db.sync()          ──invoke──▶ commands::sync()
+  db.close()         ──invoke──▶ commands::close()
                                    │
                                  wrapper::DbConnection
-                                   │ base_path.join(relative_path)
-                                   │ LibsqlBuilder::new_local()
-                                   │   .encryption_config()
-                                   │   .build()
+                                   │ catch_unwind (panic → proper Error)
+                                   ├── open_local()    — LibsqlBuilder::new_local
+                                   ├── open_replica()  — new_remote_replica + initial sync
+                                   └── open_remote()   — LibsqlBuilder::new_remote
                                    ▼
-                                 libsql (SQLite file)
+                                 libsql (SQLite / Turso)
 ```
 
 ## Building the JS Package

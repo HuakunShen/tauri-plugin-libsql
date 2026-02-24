@@ -14,6 +14,8 @@ pub enum Error {
     DatabaseNotLoaded(String),
     #[error("unsupported datatype: {0}")]
     UnsupportedDatatype(String),
+    #[error("operation not supported: {0}")]
+    OperationNotSupported(String),
     #[error("json error: {0}")]
     Json(#[from] serde_json::Error),
     #[cfg(mobile)]

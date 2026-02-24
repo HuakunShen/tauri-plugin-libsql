@@ -16,6 +16,7 @@
     "@tauri-apps/api": "^2.0.0",
     "drizzle-orm": "^0.40.0",
     "mode-watcher": "^1.1.0",
+    "svelte-sonner": "^1.0.7",
     "tauri-plugin-libsql-api": "file:../../"
   },
   "devDependencies": {

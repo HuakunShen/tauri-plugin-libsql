@@ -5,7 +5,9 @@ description = "Default permissions for the plugin"
 permissions = [
   "allow-load",
   "allow-execute",
+  "allow-batch",
   "allow-select",
   "allow-close",
-  "allow-get-config"
+  "allow-get-config",
+  "allow-sync"
 ]

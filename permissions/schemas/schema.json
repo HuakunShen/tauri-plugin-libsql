@@ -295,6 +295,18 @@
       "type": "string",
       "oneOf": [
         {
+          "description": "Enables the batch command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-batch",
+          "markdownDescription": "Enables the batch command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the batch command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-batch",
+          "markdownDescription": "Denies the batch command without any pre-configured scope."
+        },
+        {
           "description": "Enables the close command without any pre-configured scope.",
           "type": "string",
           "const": "allow-close",
@@ -379,10 +391,22 @@
           "markdownDescription": "Denies the select command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-load`\n- `allow-execute`\n- `allow-select`\n- `allow-close`\n- `allow-get-config`",
+          "description": "Enables the sync command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-sync",
+          "markdownDescription": "Enables the sync command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the sync command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-sync",
+          "markdownDescription": "Denies the sync command without any pre-configured scope."
+        },
+        {
+          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-load`\n- `allow-execute`\n- `allow-batch`\n- `allow-select`\n- `allow-close`\n- `allow-get-config`\n- `allow-sync`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-load`\n- `allow-execute`\n- `allow-select`\n- `allow-close`\n- `allow-get-config`"
+          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-load`\n- `allow-execute`\n- `allow-batch`\n- `allow-select`\n- `allow-close`\n- `allow-get-config`\n- `allow-sync`"
         }
       ]
     }

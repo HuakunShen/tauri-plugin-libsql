@@ -329,6 +329,25 @@ const rows = await db.select<{ id: number; title: string }[]>(
 );
 ```
 
+### `db.batch(queries)`
+
+Executes multiple SQL statements atomically in a single transaction. Use for DDL or bulk DML. Statements must not use bound parameters (`$1` placeholders) — use `execute()` for parameterised queries.
+
+```typescript
+await db.batch([
+  'CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)',
+  'CREATE INDEX idx_users_name ON users(name)',
+]);
+```
+
+### `db.sync()`
+
+Pulls the latest changes from the Turso remote into the local replica. No-op for local-only databases (returns without error). Requires the `replication` feature.
+
+```typescript
+await db.sync();
+```
+
 ### `db.close()`
 
 ```typescript
@@ -386,6 +405,7 @@ Or configure granular capabilities:
   "identifier": "libsql:default",
   "permissions": [
     "libsql:allow-load",
+    "libsql:allow-batch",
     "libsql:allow-execute",
     "libsql:allow-select",
     "libsql:allow-close"
@@ -408,30 +428,79 @@ Or configure granular capabilities:
 
 ---
 
-## Turso / Remote Database (Planned)
+## Turso / Remote Database
 
-The `Cargo.toml` includes a `remote` feature flag that enables libsql's remote connection mode:
+The plugin supports two remote connection modes powered by libsql.
+
+### Embedded Replica (recommended for Tauri)
+
+A local SQLite file stays in sync with a Turso cloud database. Queries read from the local file (fast, offline-capable), writes sync to the remote.
+
+**1. Enable the `replication` feature** in your app's `Cargo.toml`:
 
 ```toml
-# Cargo.toml
-[features]
-remote = ["libsql/remote", "libsql/tls"]
+tauri-plugin-libsql = { version = "0.1.0", features = ["replication"] }
 ```
 
-libsql supports connecting to [Turso](https://turso.tech) (cloud-hosted libsql) via `Builder::new_remote(url, auth_token)`, which would allow syncing data to the cloud while keeping a local copy. However, **the plugin does not yet expose this through its commands** — `wrapper.rs` currently only uses `Builder::new_local()`.
-
-Remote/embedded replica support is the most impactful planned feature. When implemented, it would allow:
+**2. Load with `syncUrl` and `authToken`:**
 
 ```typescript
-// Future API (not yet implemented)
-await Database.load({
-  path: "sqlite:local.db",
-  syncUrl: "libsql://your-db.turso.io",
-  authToken: "your-token",
+import { Database, migrate } from 'tauri-plugin-libsql-api';
+
+const db = await Database.load({
+  path: 'sqlite:local.db',           // local replica file
+  syncUrl: 'libsql://mydb-org.turso.io',
+  authToken: 'your-turso-auth-token',
+});
+
+// Sync on demand (e.g. on app resume / network reconnect)
+await db.sync();
+```
+
+On `Database.load()`, an initial sync pulls the latest data from Turso into the local file. Subsequent `sync()` calls pull incremental changes.
+
+**With Drizzle ORM:**
+
+```typescript
+const migrations = import.meta.glob<string>('./drizzle/*.sql', {
+  eager: true, query: '?raw', import: 'default',
+});
+
+const db = await Database.load({
+  path: 'sqlite:local.db',
+  syncUrl: 'libsql://mydb-org.turso.io',
+  authToken: import.meta.env.VITE_TURSO_AUTH_TOKEN,
+});
+
+await migrate(db.path, migrations);
+
+const drizzleDb = drizzle(createDrizzleProxy(db.path), { schema });
+```
+
+---
+
+### Pure Remote
+
+All queries execute on Turso directly — no local file. Requires network for every query.
+
+**Enable the `remote` feature:**
+
+```toml
+tauri-plugin-libsql = { version = "0.1.0", features = ["remote"] }
+```
+
+```typescript
+const db = await Database.load({
+  path: 'libsql://mydb-org.turso.io',
+  authToken: 'your-turso-auth-token',
 });
 ```
 
-If you need this now, contributions are welcome.
+For most Tauri apps, **embedded replica is the better choice** — it works offline and is significantly faster for reads.
+
+> **Note on `batch()` with embedded replicas**: libsql's `execute_batch()` does not correctly route writes through the embedded replica layer in some versions. The plugin uses individual `execute()` calls inside an explicit `BEGIN`/`COMMIT` transaction to avoid this.
+
+> **Note on URL validation**: libsql's builder calls `unwrap()` internally on the sync URL and can panic on a malformed value (e.g. leading/trailing whitespace, wrong scheme). The plugin wraps this in `catch_unwind` so a bad URL surfaces as a proper error instead of hanging the IPC indefinitely.
 
 ---
 

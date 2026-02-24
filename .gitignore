@@ -17,4 +17,4 @@ dist-js
 dist
 
 references/
-*.db
+*.db*

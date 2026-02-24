@@ -2145,10 +2145,16 @@
           "markdownDescription": "Denies the unminimize command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-load`\n- `allow-execute`\n- `allow-select`\n- `allow-close`\n- `allow-get-config`",
+          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-load`\n- `allow-execute`\n- `allow-batch`\n- `allow-select`\n- `allow-close`\n- `allow-get-config`\n- `allow-sync`",
           "type": "string",
           "const": "libsql:default",
-          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-load`\n- `allow-execute`\n- `allow-select`\n- `allow-close`\n- `allow-get-config`"
+          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-load`\n- `allow-execute`\n- `allow-batch`\n- `allow-select`\n- `allow-close`\n- `allow-get-config`\n- `allow-sync`"
+        },
+        {
+          "description": "Enables the batch command without any pre-configured scope.",
+          "type": "string",
+          "const": "libsql:allow-batch",
+          "markdownDescription": "Enables the batch command without any pre-configured scope."
         },
         {
           "description": "Enables the close command without any pre-configured scope.",
@@ -2187,6 +2193,18 @@
           "markdownDescription": "Enables the select command without any pre-configured scope."
         },
         {
+          "description": "Enables the sync command without any pre-configured scope.",
+          "type": "string",
+          "const": "libsql:allow-sync",
+          "markdownDescription": "Enables the sync command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the batch command without any pre-configured scope.",
+          "type": "string",
+          "const": "libsql:deny-batch",
+          "markdownDescription": "Denies the batch command without any pre-configured scope."
+        },
+        {
           "description": "Denies the close command without any pre-configured scope.",
           "type": "string",
           "const": "libsql:deny-close",
@@ -2221,6 +2239,12 @@
           "type": "string",
           "const": "libsql:deny-select",
           "markdownDescription": "Denies the select command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the sync command without any pre-configured scope.",
+          "type": "string",
+          "const": "libsql:deny-sync",
+          "markdownDescription": "Denies the sync command without any pre-configured scope."
         }
       ]
     },

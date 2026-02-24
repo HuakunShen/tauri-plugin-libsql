@@ -32,7 +32,9 @@ pub fn init_with_config<R: Runtime>(config: Config) -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             commands::load,
             commands::execute,
+            commands::batch,
             commands::select,
+            commands::sync,
             commands::close,
             commands::ping,
             commands::get_config

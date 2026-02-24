@@ -19,5 +19,5 @@ tauri-build = { version = "2.5.4", default-features = false , features = [] }
 
 [dependencies]
 tauri = { version = "2.10.0", features = [] }
-tauri-plugin-libsql = { path = "../../../" }
+tauri-plugin-libsql = { path = "../../../", features = ["replication"] }
 
