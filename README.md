@@ -471,13 +471,15 @@ The plugin supports two remote connection modes powered by libsql.
 
 A local SQLite file stays in sync with a Turso cloud database. Queries read from the local file (fast, offline-capable), writes sync to the remote.
 
-> ⚠️ **Limitation: Embedded replica encryption is currently broken**
-> Due to an upstream libsql bug, local encryption is **silently disabled** when using embedded replicas (`syncUrl`). The local replica file will be stored **unencrypted** even if you pass an `encryption` config. See [Issue #1](https://github.com/HuakunShen/tauri-plugin-libsql/issues/1) for details.
+> ⚠️ **Limitation: Embedded replica encryption requires a vendored libsql fork**
+> Due to an upstream libsql bug, local encryption is **silently disabled** when using embedded replicas (`syncUrl`). The V2 sync protocol (used by Turso) switches to a code path that drops the `encryption_config` entirely, leaving the local replica file **unencrypted**. See [Issue #1](https://github.com/HuakunShen/tauri-plugin-libsql/issues/1) for details.
 >
-> **Workarounds:**
-> - Use **pure remote mode** (no local file) if you don't need offline access
-> - Use **local-only databases** with encryption for sensitive local data
-> - Accept the unencrypted replica (Turso access control still protects the remote data)
+> **Status:** This plugin includes a [vendored fork](https://github.com/nicepkg/libsql) of libsql with the fix applied — encryption now works correctly with embedded replicas. However, because the fix is not yet merged upstream, the plugin cannot be published to crates.io (which does not allow `path` dependencies). You must use this plugin via a git dependency or local path for now.
+>
+> ```toml
+> # Cargo.toml — use git dependency until the fix is upstreamed
+> tauri-plugin-libsql = { git = "https://github.com/nicepkg/tauri-plugin-libsql", features = ["replication", "encryption"] }
+> ```
 
 **1. Enable the `replication` feature** in your app's `Cargo.toml`:
 

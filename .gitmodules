@@ -1,0 +1,3 @@
+[submodule "vendors/libsql"]
+	path = vendors/libsql
+	url = https://github.com/HuakunShen/libsql.git
