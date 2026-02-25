@@ -9,9 +9,14 @@ The fastest way to understand the full workflow (Drizzle ORM, browser-safe migra
 ![Todo List Demo App](examples/todo-list/todo-list.png)
 
 ```bash
+# build js plugin API package first
+pnpm install
+pnpm build
+
+# run the example app
 cd examples/todo-list
-bun install
-bun run tauri dev
+pnpm install
+pnpm run tauri dev
 ```
 
 For a complete walkthrough, see [`examples/todo-list/README.md`](examples/todo-list/README.md).

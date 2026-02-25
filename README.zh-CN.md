@@ -2,6 +2,108 @@
 
 一个用于 [libsql](https://github.com/tursodatabase/libsql) 的 Tauri 插件，内置 AES-256-CBC 加密、Drizzle ORM 支持，以及浏览器兼容的迁移运行器。
 
+## 试用示例应用
+
+理解完整工作流程（Drizzle ORM、浏览器安全迁移、可选加密和 Turso 同步）的最快方式是运行演示应用。
+
+![Todo List 演示应用](examples/todo-list/todo-list.png)
+
+```bash
+
+# 先构建 JS 插件 API 包
+
+pnpm install
+
+pnpm build
+
+
+
+# 运行示例应用
+
+cd examples/todo-list
+
+pnpm install
+
+pnpm run tauri dev
+
+```
+
+完整的操作指南，请参见 [`examples/todo-list/README.md`](examples/todo-list/README.md)。
+
+---
+
+## 目录
+
+- [试用示例应用](#试用示例应用)
+
+- [为什么选择这个插件？](#为什么选择这个插件)
+
+- [功能特性](#功能特性)
+
+- [安装](#安装)
+
+- [快速开始](#快速开始)
+
+- [数据库位置](#数据库位置)
+
+- [Drizzle ORM 集成](#drizzle-orm-集成)
+
+- [迁移](#迁移)
+
+- [加密](#加密)
+
+- [API 参考](#api-参考)
+
+- [权限](#权限)
+
+- [与 @tauri-apps/plugin-sql 的比较](#与-tauri-appspluginsql-的比较)
+
+- [Turso / 远程数据库](#turso--远程数据库)
+
+- [包大小](#包大小)
+
+- [使用 AI 集成此插件](#使用-ai-集成此插件)
+
+- [项目结构](#项目结构)
+
+---
+
+## 为什么选择这个插件？
+
+## 目录
+
+- [为什么选择这个插件？](#为什么选择这个插件)
+
+- [功能特性](#功能特性)
+
+- [安装](#安装)
+
+- [快速开始](#快速开始)
+
+- [数据库位置](#数据库位置)
+
+- [Drizzle ORM 集成](#drizzle-orm-集成)
+
+- [迁移](#迁移)
+
+- [加密](#加密)
+
+- [API 参考](#api-参考)
+
+- [权限](#权限)
+
+- [与 @tauri-apps/plugin-sql 的比较](#与-tauri-appspluginsql-的比较)
+
+- [Turso / 远程数据库](#turso--远程数据库)
+
+- [包大小](#包大小)
+
+- [使用 AI 集成此插件](#使用-ai-集成此插件)
+
+- [项目结构](#项目结构)
+
+## 为什么选择这个插件？
+
 ## 为什么选择这个插件？
 
 ### 1. Rust ORM 在应用开发中很痛苦
@@ -50,7 +152,9 @@ await migrate("sqlite:myapp.db", migrations);
 - **跨平台**：macOS、Windows、Linux、iOS、Android
     **已测试**
     - [x] MacOS
-    - [ ] Windows
+    - [x] Windows
+
+    - [x] Linux
     - [ ] Linux
     - [ ] iOS
     - [ ] Android
@@ -435,6 +539,40 @@ const { encrypted } = await getConfig();
 ### 嵌入式副本（推荐用于 Tauri）
 
 本地 SQLite 文件与 Turso 云数据库保持同步。查询从本地文件读取（快速、离线可用），写入同步到远程。
+
+> ⚠️ **限制：嵌入式副本加密目前在 `main` 分支上存在问题**
+
+> 由于上游 libsql 的一个 bug，当使用嵌入式副本（`syncUrl`）时，本地加密被**静默禁用**。V2 同步协议（Turso 始终使用）切换到了一条丢弃 `encryption_config` 的代码路径，导致即使传递了 `encryption` 配置，本地副本文件仍然**未加密**。详情请参见 [Issue #1](https://github.com/HuakunShen/tauri-plugin-libsql/issues/1)。
+
+>
+
+> **[`fix/sync-encryption`](../../tree/fix/sync-encryption) 分支上有可用的修复：**
+
+> 该分支使用了 [libsql 的一个 fork](https://github.com/HuakunShen/libsql)，它将 `encryption_config` 传递到 V2 同步路径，并通过 `sqlite3_rekey` 加密引导的副本。它可以工作，但无法发布到 crates.io（不允许路径依赖）。通过 git 使用它：
+
+>
+
+> ```toml
+
+> tauri-plugin-libsql = { git = "https://github.com/HuakunShen/tauri-plugin-libsql", branch = "fix/sync-encryption", features = ["replication", "encryption"] }
+
+> ```
+
+>
+
+> **（在 `main` 分支上）的变通方案：**
+
+>
+
+> - 使用 **`fix/sync-encryption` 分支**（如果你需要加密的副本，这是推荐的）
+
+> - 如果你不需要离线访问，使用**纯远程模式**（没有本地文件）
+
+> - 对敏感的本地数据使用**纯本地数据库**并启用加密
+
+> - 接受未加密的副本（Turso 访问控制仍然保护远程数据）
+
+**1. 在你的应用 `Cargo.toml` 中启用 `replication` 功能**：
 
 **1. 在你的应用 `Cargo.toml` 中启用 `replication` 功能**：
 
