@@ -467,14 +467,22 @@ Or configure granular capabilities:
 
 The plugin supports two remote connection modes powered by libsql.
 
-### Embedded Replica (recommended for Tauri)
+### Embedded Replica
 
 A local SQLite file stays in sync with a Turso cloud database. Queries read from the local file (fast, offline-capable), writes sync to the remote.
 
-> ⚠️ **Limitation: Embedded replica encryption is currently broken**
-> Due to an upstream libsql bug, local encryption is **silently disabled** when using embedded replicas (`syncUrl`). The local replica file will be stored **unencrypted** even if you pass an `encryption` config. See [Issue #1](https://github.com/HuakunShen/tauri-plugin-libsql/issues/1) for details.
+> ⚠️ **Limitation: Embedded replica encryption is currently broken on `main`**
+> Due to an upstream libsql bug, local encryption is **silently disabled** when using embedded replicas (`syncUrl`). The V2 sync protocol (which Turso always uses) switches to a code path that drops the `encryption_config`, leaving the local replica file **unencrypted** even if you pass an `encryption` config. See [Issue #1](https://github.com/HuakunShen/tauri-plugin-libsql/issues/1) for details.
 >
-> **Workarounds:**
+> **Fix available on [`fix/sync-encryption`](../../tree/fix/sync-encryption) branch:**
+> That branch vendors a [fork of libsql](https://github.com/nicepkg/libsql) that threads `encryption_config` through the V2 sync path and encrypts the bootstrapped replica via `sqlite3_rekey`. It works but cannot be published to crates.io (path dependencies are not allowed). Use it via git:
+>
+> ```toml
+> tauri-plugin-libsql = { git = "https://github.com/nicepkg/tauri-plugin-libsql", branch = "fix/sync-encryption", features = ["replication", "encryption"] }
+> ```
+>
+> **Workarounds (on `main`):**
+> - Use the **`fix/sync-encryption` branch** (recommended if you need encrypted replicas)
 > - Use **pure remote mode** (no local file) if you don't need offline access
 > - Use **local-only databases** with encryption for sensitive local data
 > - Accept the unencrypted replica (Turso access control still protects the remote data)
