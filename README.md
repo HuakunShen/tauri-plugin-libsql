@@ -85,8 +85,8 @@ The `migrate()` function in this plugin receives the pre-loaded SQL strings, tra
 - **Cross-platform**: macOS, Windows, Linux, iOS, Android
     **Tested on**
     - [x] MacOS
-    - [ ] Windows
-    - [ ] Linux
+    - [x] Windows
+    - [x] Linux
     - [ ] iOS
     - [ ] Android
 
@@ -470,6 +470,14 @@ The plugin supports two remote connection modes powered by libsql.
 ### Embedded Replica (recommended for Tauri)
 
 A local SQLite file stays in sync with a Turso cloud database. Queries read from the local file (fast, offline-capable), writes sync to the remote.
+
+> ⚠️ **Limitation: Embedded replica encryption is currently broken**
+> Due to an upstream libsql bug, local encryption is **silently disabled** when using embedded replicas (`syncUrl`). The local replica file will be stored **unencrypted** even if you pass an `encryption` config. See [Issue #1](https://github.com/HuakunShen/tauri-plugin-libsql/issues/1) for details.
+>
+> **Workarounds:**
+> - Use **pure remote mode** (no local file) if you don't need offline access
+> - Use **local-only databases** with encryption for sensitive local data
+> - Accept the unencrypted replica (Turso access control still protects the remote data)
 
 **1. Enable the `replication` feature** in your app's `Cargo.toml`:
 
