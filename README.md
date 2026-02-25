@@ -54,7 +54,7 @@ This plugin solves that with Drizzle's [sqlite-proxy](https://orm.drizzle.team/d
 Drizzle's built-in migrator reads `.sql` files from disk at runtime using Node's `fs` module — which doesn't exist in a browser/WebView context. Two workarounds exist:
 
 - **Tauri resource folder** — bundle files as app resources and read them via Tauri's asset protocol. Works but requires extra Tauri config.
-- **Vite `import.meta.glob`** *(this plugin's approach)* — Vite bundles the SQL file contents directly into the JavaScript at build time. No runtime filesystem access needed, no extra config.
+- **Vite `import.meta.glob`** _(this plugin's approach)_ — Vite bundles the SQL file contents directly into the JavaScript at build time. No runtime filesystem access needed, no extra config.
 
 ```typescript
 // Vite resolves these at build time — the SQL text is inlined into the JS bundle
@@ -83,12 +83,12 @@ The `migrate()` function in this plugin receives the pre-loaded SQL strings, tra
 - **Migration runner** — browser-safe `migrate()` that bundles SQL files at build time via Vite
 - **API compatible** with `@tauri-apps/plugin-sql` where applicable
 - **Cross-platform**: macOS, Windows, Linux, iOS, Android
-    **Tested on**
-    - [x] MacOS
-    - [x] Windows
-    - [x] Linux
-    - [ ] iOS
-    - [ ] Android
+  **Tested on**
+  - [x] MacOS
+  - [x] Windows
+  - [x] Linux
+  - [ ] iOS
+  - [ ] Android
 
 ---
 
@@ -144,17 +144,14 @@ tauri::Builder::default()
 ### 2. Use the Database class (TypeScript)
 
 ```typescript
-import { Database } from 'tauri-plugin-libsql-api';
+import { Database } from "tauri-plugin-libsql-api";
 
-const db = await Database.load('sqlite:myapp.db');
+const db = await Database.load("sqlite:myapp.db");
 
-await db.execute(
-  'INSERT INTO users (name) VALUES ($1)',
-  ['Alice']
-);
+await db.execute("INSERT INTO users (name) VALUES ($1)", ["Alice"]);
 
 const users = await db.select<{ id: number; name: string }[]>(
-  'SELECT * FROM users'
+  "SELECT * FROM users",
 );
 
 await db.close();
@@ -180,11 +177,11 @@ Relative paths are normalised (`..` components are folded) and must remain withi
 ### Setup
 
 ```typescript
-import { drizzle } from 'drizzle-orm/sqlite-proxy';
-import { createDrizzleProxy } from 'tauri-plugin-libsql-api';
-import * as schema from './schema';
+import { drizzle } from "drizzle-orm/sqlite-proxy";
+import { createDrizzleProxy } from "tauri-plugin-libsql-api";
+import * as schema from "./schema";
 
-const db = drizzle(createDrizzleProxy('sqlite:myapp.db'), { schema });
+const db = drizzle(createDrizzleProxy("sqlite:myapp.db"), { schema });
 
 const users = await db.select().from(schema.users);
 ```
@@ -194,17 +191,17 @@ const users = await db.select().from(schema.users);
 ### With Encryption
 
 ```typescript
-import { createDrizzleProxyWithEncryption } from 'tauri-plugin-libsql-api';
+import { createDrizzleProxyWithEncryption } from "tauri-plugin-libsql-api";
 
 const db = drizzle(
   createDrizzleProxyWithEncryption({
-    path: 'sqlite:encrypted.db',
+    path: "sqlite:encrypted.db",
     encryption: {
-      cipher: 'aes256cbc',
+      cipher: "aes256cbc",
       key: myKey32Bytes, // number[] | Uint8Array, 32 bytes
     },
   }),
-  { schema }
+  { schema },
 );
 ```
 
@@ -219,23 +216,23 @@ The standard `drizzle-orm/sqlite-proxy/migrator` reads from the filesystem at ru
 **1. Define your schema** (`src/lib/schema.ts`):
 
 ```typescript
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-export const users = sqliteTable('users', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  name: text('name').notNull(),
+export const users = sqliteTable("users", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
 });
 ```
 
 **2. Configure drizzle-kit** (`drizzle.config.ts`):
 
 ```typescript
-import { defineConfig } from 'drizzle-kit';
+import { defineConfig } from "drizzle-kit";
 
 export default defineConfig({
-  dialect: 'sqlite',
-  schema: './src/lib/schema.ts',
-  out: './drizzle',
+  dialect: "sqlite",
+  schema: "./src/lib/schema.ts",
+  out: "./drizzle",
 });
 ```
 
@@ -249,21 +246,21 @@ npx drizzle-kit generate
 **4. Run migrations on startup**:
 
 ```typescript
-import { Database, migrate } from 'tauri-plugin-libsql-api';
+import { Database, migrate } from "tauri-plugin-libsql-api";
 
 // Vite bundles these SQL files into the app at build time
-const migrations = import.meta.glob<string>('./drizzle/*.sql', {
+const migrations = import.meta.glob<string>("./drizzle/*.sql", {
   eager: true,
-  query: '?raw',
-  import: 'default',
+  query: "?raw",
+  import: "default",
 });
 
 // Startup sequence: load → migrate → query
-await Database.load('sqlite:myapp.db');
-await migrate('sqlite:myapp.db', migrations);
+await Database.load("sqlite:myapp.db");
+await migrate("sqlite:myapp.db", migrations);
 
 // Now safe to query
-const db = drizzle(createDrizzleProxy('sqlite:myapp.db'), { schema });
+const db = drizzle(createDrizzleProxy("sqlite:myapp.db"), { schema });
 ```
 
 ### How `migrate()` works
@@ -285,8 +282,8 @@ npx drizzle-kit generate
 ### Options
 
 ```typescript
-await migrate('sqlite:myapp.db', migrations, {
-  migrationsTable: '__my_migrations', // default: '__drizzle_migrations'
+await migrate("sqlite:myapp.db", migrations, {
+  migrationsTable: "__my_migrations", // default: '__drizzle_migrations'
 });
 ```
 
@@ -315,15 +312,16 @@ const key = new Uint8Array(32);
 crypto.getRandomValues(key);
 
 const db = await Database.load({
-  path: 'sqlite:secrets.db',
+  path: "sqlite:secrets.db",
   encryption: {
-    cipher: 'aes256cbc',
+    cipher: "aes256cbc",
     key: Array.from(key), // number[] or Uint8Array
   },
 });
 ```
 
 **Security notes:**
+
 - AES-256-CBC requires exactly 32 bytes
 - Store keys in the OS keychain or secure storage — lost key = lost data
 - Plugin-level encryption is preferred; it keeps keys out of JavaScript
@@ -336,22 +334,21 @@ const db = await Database.load({
 
 ```typescript
 // Simple
-const db = await Database.load('sqlite:myapp.db');
+const db = await Database.load("sqlite:myapp.db");
 
 // With encryption
 const db = await Database.load({
-  path: 'sqlite:myapp.db',
-  encryption: { cipher: 'aes256cbc', key: myKey },
+  path: "sqlite:myapp.db",
+  encryption: { cipher: "aes256cbc", key: myKey },
 });
 ```
 
 ### `db.execute(query, values?)`
 
 ```typescript
-const result = await db.execute(
-  'INSERT INTO todos (title) VALUES ($1)',
-  ['Buy milk']
-);
+const result = await db.execute("INSERT INTO todos (title) VALUES ($1)", [
+  "Buy milk",
+]);
 // result.rowsAffected, result.lastInsertId
 ```
 
@@ -359,8 +356,8 @@ const result = await db.execute(
 
 ```typescript
 const rows = await db.select<{ id: number; title: string }[]>(
-  'SELECT * FROM todos WHERE completed = $1',
-  [0]
+  "SELECT * FROM todos WHERE completed = $1",
+  [0],
 );
 ```
 
@@ -370,8 +367,8 @@ Executes multiple SQL statements atomically in a single transaction. Use for DDL
 
 ```typescript
 await db.batch([
-  'CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)',
-  'CREATE INDEX idx_users_name ON users(name)',
+  "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)",
+  "CREATE INDEX idx_users_name ON users(name)",
 ]);
 ```
 
@@ -392,15 +389,15 @@ await db.close();
 ### `migrate(dbPath, migrationFiles, options?)`
 
 ```typescript
-import { migrate } from 'tauri-plugin-libsql-api';
+import { migrate } from "tauri-plugin-libsql-api";
 
-const migrations = import.meta.glob<string>('./drizzle/*.sql', {
+const migrations = import.meta.glob<string>("./drizzle/*.sql", {
   eager: true,
-  query: '?raw',
-  import: 'default',
+  query: "?raw",
+  import: "default",
 });
 
-await migrate('sqlite:myapp.db', migrations);
+await migrate("sqlite:myapp.db", migrations);
 ```
 
 ### `createDrizzleProxy(dbPath)`
@@ -414,7 +411,7 @@ Same as above but with encryption config.
 ### `getConfig()`
 
 ```typescript
-import { getConfig } from 'tauri-plugin-libsql-api';
+import { getConfig } from "tauri-plugin-libsql-api";
 
 const { encrypted } = await getConfig();
 ```
@@ -452,14 +449,14 @@ Or configure granular capabilities:
 
 ## Comparison with @tauri-apps/plugin-sql
 
-| Feature | tauri-plugin-libsql | @tauri-apps/plugin-sql |
-|---------|---------------------|------------------------|
-| SQLite | ✅ libsql | ✅ sqlx |
-| Encryption | ✅ AES-256-CBC built-in | ❌ |
-| Drizzle ORM | ✅ | ✅ |
-| Migration runner | ✅ browser-safe | ❌ |
-| MySQL / PostgreSQL | ❌ | ✅ |
-| API compatibility | Partial | Full |
+| Feature            | tauri-plugin-libsql     | @tauri-apps/plugin-sql |
+| ------------------ | ----------------------- | ---------------------- |
+| SQLite             | ✅ libsql               | ✅ sqlx                |
+| Encryption         | ✅ AES-256-CBC built-in | ❌                     |
+| Drizzle ORM        | ✅                      | ✅                     |
+| Migration runner   | ✅ browser-safe         | ❌                     |
+| MySQL / PostgreSQL | ❌                      | ✅                     |
+| API compatibility  | Partial                 | Full                   |
 
 ---
 
@@ -475,13 +472,14 @@ A local SQLite file stays in sync with a Turso cloud database. Queries read from
 > Due to an upstream libsql bug, local encryption is **silently disabled** when using embedded replicas (`syncUrl`). The V2 sync protocol (which Turso always uses) switches to a code path that drops the `encryption_config`, leaving the local replica file **unencrypted** even if you pass an `encryption` config. See [Issue #1](https://github.com/HuakunShen/tauri-plugin-libsql/issues/1) for details.
 >
 > **Fix available on [`fix/sync-encryption`](../../tree/fix/sync-encryption) branch:**
-> That branch vendors a [fork of libsql](https://github.com/nicepkg/libsql) that threads `encryption_config` through the V2 sync path and encrypts the bootstrapped replica via `sqlite3_rekey`. It works but cannot be published to crates.io (path dependencies are not allowed). Use it via git:
+> That branch vendors a [fork of libsql](https://github.com/HuakunShen/libsql) that threads `encryption_config` through the V2 sync path and encrypts the bootstrapped replica via `sqlite3_rekey`. It works but cannot be published to crates.io (path dependencies are not allowed). Use it via git:
 >
 > ```toml
-> tauri-plugin-libsql = { git = "https://github.com/nicepkg/tauri-plugin-libsql", branch = "fix/sync-encryption", features = ["replication", "encryption"] }
+> tauri-plugin-libsql = { git = "https://github.com/HuakunShen/tauri-plugin-libsql", branch = "fix/sync-encryption", features = ["replication", "encryption"] }
 > ```
 >
 > **Workarounds (on `main`):**
+>
 > - Use the **`fix/sync-encryption` branch** (recommended if you need encrypted replicas)
 > - Use **pure remote mode** (no local file) if you don't need offline access
 > - Use **local-only databases** with encryption for sensitive local data
@@ -496,12 +494,12 @@ tauri-plugin-libsql = { version = "0.1.0", features = ["replication"] }
 **2. Load with `syncUrl` and `authToken`:**
 
 ```typescript
-import { Database, migrate } from 'tauri-plugin-libsql-api';
+import { Database, migrate } from "tauri-plugin-libsql-api";
 
 const db = await Database.load({
-  path: 'sqlite:local.db',           // local replica file
-  syncUrl: 'libsql://mydb-org.turso.io',
-  authToken: 'your-turso-auth-token',
+  path: "sqlite:local.db", // local replica file
+  syncUrl: "libsql://mydb-org.turso.io",
+  authToken: "your-turso-auth-token",
 });
 
 // Sync on demand (e.g. on app resume / network reconnect)
@@ -513,13 +511,15 @@ On `Database.load()`, an initial sync pulls the latest data from Turso into the 
 **With Drizzle ORM:**
 
 ```typescript
-const migrations = import.meta.glob<string>('./drizzle/*.sql', {
-  eager: true, query: '?raw', import: 'default',
+const migrations = import.meta.glob<string>("./drizzle/*.sql", {
+  eager: true,
+  query: "?raw",
+  import: "default",
 });
 
 const db = await Database.load({
-  path: 'sqlite:local.db',
-  syncUrl: 'libsql://mydb-org.turso.io',
+  path: "sqlite:local.db",
+  syncUrl: "libsql://mydb-org.turso.io",
   authToken: import.meta.env.VITE_TURSO_AUTH_TOKEN,
 });
 
@@ -542,8 +542,8 @@ tauri-plugin-libsql = { version = "0.1.0", features = ["remote"] }
 
 ```typescript
 const db = await Database.load({
-  path: 'libsql://mydb-org.turso.io',
-  authToken: 'your-turso-auth-token',
+  path: "libsql://mydb-org.turso.io",
+  authToken: "your-turso-auth-token",
 });
 ```
 
@@ -559,10 +559,10 @@ For most Tauri apps, **embedded replica is the better choice** — it works offl
 
 Based on the included Todo List demo app (macOS, aarch64, release build):
 
-| Format | With encryption | Without encryption |
-|--------|----------------|--------------------|
-| `.app` bundle | 15 MB | 15 MB |
-| `.dmg` installer | 6.0 MB | 5.9 MB |
+| Format           | With encryption | Without encryption |
+| ---------------- | --------------- | ------------------ |
+| `.app` bundle    | 15 MB           | 15 MB              |
+| `.dmg` installer | 6.0 MB          | 5.9 MB             |
 
 Disabling encryption saves essentially nothing — the AES cipher code is negligible compared to the SQLite native library that's always present. The `encryption` feature flag still exists to avoid compiling encryption-related code if you want to enforce at compile time that no database can be encrypted.
 
@@ -578,12 +578,12 @@ tauri-plugin-libsql = { version = "0.1.0", default-features = false, features = 
 
 **Available features:**
 
-| Feature | Default | Description |
-|---------|---------|-------------|
-| `core` | ✅ | Local SQLite databases (always required) |
-| `encryption` | ✅ | AES-256-CBC encryption via libsql |
-| `replication` | ❌ | libsql replication support (adds TLS) |
-| `remote` | ❌ | Remote database support (planned, see below) |
+| Feature       | Default | Description                                  |
+| ------------- | ------- | -------------------------------------------- |
+| `core`        | ✅      | Local SQLite databases (always required)     |
+| `encryption`  | ✅      | AES-256-CBC encryption via libsql            |
+| `replication` | ❌      | libsql replication support (adds TLS)        |
+| `remote`      | ❌      | Remote database support (planned, see below) |
 
 When `encryption` is disabled, passing an `EncryptionConfig` to `Database.load()` returns an error at runtime. The TypeScript API surface is unchanged — no rebuild of your JS code needed.
 
