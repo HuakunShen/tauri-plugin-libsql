@@ -245,7 +245,7 @@ export default defineConfig({
 
 ```bash
 npx drizzle-kit generate
-# creates drizzle/0000_init.sql, drizzle/0001_add_column.sql, etc.
+# creates either flat SQL files or Drizzle v1/RC migration folders
 ```
 
 **4. Run migrations on startup**:
@@ -253,8 +253,9 @@ npx drizzle-kit generate
 ```typescript
 import { Database, migrate } from "tauri-plugin-libsql-api";
 
-// Vite bundles these SQL files into the app at build time
-const migrations = import.meta.glob<string>("./drizzle/*.sql", {
+// Vite bundles these SQL files into the app at build time.
+// The glob supports both flat files and Drizzle v1/RC folder migrations.
+const migrations = import.meta.glob<string>("./drizzle/**/*.sql", {
   eager: true,
   query: "?raw",
   import: "default",
@@ -271,9 +272,10 @@ const db = drizzle(createDrizzleProxy("sqlite:myapp.db"), { schema });
 ### How `migrate()` works
 
 - Creates a `__drizzle_migrations` tracking table if it doesn't exist
-- Parses migration filenames by their numeric prefix (`0000_`, `0001_`, etc.)
+- Parses flat migration filenames and Drizzle v1/RC folder names by their numeric prefix (`0000_`, `0001_`, `20260605110000_`, etc.)
 - Applies only pending migrations in order
-- Records each applied migration by filename
+- Records each applied migration by a stable id: the filename for flat migrations, or the parent folder name plus `.sql` for Drizzle v1/RC folder migrations
+- Recognizes the legacy `migration.sql` marker left by older versions and continues with later Drizzle v1/RC folder migrations
 
 ### Adding schema changes
 
@@ -396,7 +398,7 @@ await db.close();
 ```typescript
 import { migrate } from "tauri-plugin-libsql-api";
 
-const migrations = import.meta.glob<string>("./drizzle/*.sql", {
+const migrations = import.meta.glob<string>("./drizzle/**/*.sql", {
   eager: true,
   query: "?raw",
   import: "default",

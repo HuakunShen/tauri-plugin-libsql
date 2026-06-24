@@ -27,19 +27,53 @@ interface ParsedMigration {
   filename: string
   sql: string
   index: number
+  isFolderV3: boolean
+}
+
+function parseMigrationPath(path: string): Omit<ParsedMigration, 'sql'> | null {
+  const segments = path.split(/[\\/]+/).filter(Boolean)
+  const fileName = segments[segments.length - 1]
+
+  if (!fileName) {
+    return null
+  }
+
+  if (fileName === 'migration.sql' && segments.length >= 2) {
+    const folderName = segments[segments.length - 2]
+    const match = folderName.match(/^(\d+)[_\-].*$/)
+
+    if (match) {
+      return {
+        filename: `${folderName}.sql`,
+        index: parseInt(match[1], 10),
+        isFolderV3: true,
+      }
+    }
+  }
+
+  const match = fileName.match(/^(\d+)[_\-].*\.sql$/)
+  if (!match) {
+    return null
+  }
+
+  return {
+    filename: fileName,
+    index: parseInt(match[1], 10),
+    isFolderV3: false,
+  }
 }
 
 function parseMigrations(files: MigrationFiles): ParsedMigration[] {
   const migrations: ParsedMigration[] = []
 
   for (const [path, sql] of Object.entries(files)) {
-    // Match drizzle-kit naming: 0000_xxx.sql, 0001_xxx.sql, etc.
-    const match = path.match(/(\d+)[_\-].*\.sql$/)
-    if (match && sql) {
+    const parsedPath = parseMigrationPath(path)
+    if (parsedPath && sql) {
       migrations.push({
-        filename: path.split('/').pop()!,
+        filename: parsedPath.filename,
         sql: sql as string,
-        index: parseInt(match[1], 10),
+        index: parsedPath.index,
+        isFolderV3: parsedPath.isFolderV3,
       })
     }
   }
@@ -104,9 +138,16 @@ export async function migrate(
 
   // Parse and sort migration files
   const migrations = parseMigrations(migrationFiles)
+  const legacyFolderV3Migration = appliedSet.has('migration.sql')
+    ? migrations.find((migration) => migration.isFolderV3)
+    : undefined
 
   for (const migration of migrations) {
     if (appliedSet.has(migration.filename)) {
+      continue
+    }
+
+    if (migration.filename === legacyFolderV3Migration?.filename) {
       continue
     }
 
