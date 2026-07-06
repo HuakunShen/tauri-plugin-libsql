@@ -1,5 +1,9 @@
 # Tauri Plugin libsql
 
+[![npm](https://img.shields.io/npm/v/tauri-plugin-libsql-api.svg)](https://www.npmjs.com/package/tauri-plugin-libsql-api)
+[![Rust crate](https://img.shields.io/crates/v/tauri-plugin-libsql.svg)](https://crates.io/crates/tauri-plugin-libsql)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/HuakunShen/tauri-plugin-libsql)
+
 A Tauri plugin for [libsql](https://github.com/tursodatabase/libsql) with built-in AES-256-CBC encryption, Drizzle ORM support, and a browser-compatible migration runner.
 
 ## Try the Example App
